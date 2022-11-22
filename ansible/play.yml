@@ -1,0 +1,191 @@
+### This will install prerequistes on all the kubernetes nodes (i.e masters and workers)
+- hosts: all
+  become: 'yes'
+  tasks:
+    
+    - name: Create containerd config file
+      file:
+        path: /etc/modules-load.d/containerd.conf
+        state: touch
+    
+    - name: Add conf for containerd
+      blockinfile:
+        path: /etc/modules-load.d/containerd.conf
+        block: |
+          overlay
+          br_netfilter
+    
+    - name: modprobe
+      shell: |
+        sudo modprobe overlay
+        sudo modprobe br_netfilter
+    
+    - name: Set system configurations for Kubernetes networking
+      file:
+        path: /etc/sysctl.d/99-kubernetes-cri.conf
+        state: touch
+    
+    - name: Add conf for containerd
+      blockinfile:
+        path: /etc/sysctl.d/99-kubernetes-cri.conf
+        block: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.ipv4.ip_forward = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+    
+    - name: Apply new settings
+      command: sudo sysctl --system
+    
+    - name: install containerd
+      shell: |
+        sudo apt-get update && sudo apt-get install -y containerd
+        sudo mkdir -p /etc/containerd
+        sudo containerd config default | sudo tee /etc/containerd/config.toml
+        sudo systemctl restart containerd
+    
+    - name: disable swap
+      shell: |
+        sudo swapoff -a
+        sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+    
+    - name: install and configure dependencies
+      shell: |
+        sudo apt-get update && sudo apt-get install -y apt-transport-https curl
+        curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+    
+    - name: Create kubernetes repo file
+      file:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        state: touch
+    
+    - name: Add K8s Source
+      blockinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        block: |
+          deb https://apt.kubernetes.io/ kubernetes-xenial main
+    
+    - name: install kubernetes
+      shell: |
+        sudo apt-get update
+        sudo apt-get install -y kubelet=1.20.1-00 kubeadm=1.20.1-00 kubectl=1.20.1-00
+        sudo apt-mark hold kubelet kubeadm kubectl
+
+### master node configurations
+- hosts: masters_first
+  become: 'yes'
+  vars_files:
+    - ansible_vars_file.yml
+  tasks:
+    
+    - name: Kubectl Install
+      apt:
+        name: kubectl
+        state: present
+        force: 'yes'
+    
+    - name: Start the cluster
+      shell: kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address="{{ master_ip }}" >> cluster.txt
+      register: result
+      args:
+        chdir: $HOME
+        creates: cluster.txt
+    
+    - name: Sleep for 20 seconds
+      wait_for:
+        timeout: 20
+    
+    - name: Create .kube directory
+      become: 'yes'
+      become_user: ubuntu
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 493
+    
+    - name: Check admin.conf file exists.
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_conf
+    
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: 'yes'
+        owner: ubuntu
+      when: k8s_conf.stat.exists
+    
+    - name: Install Pod network
+      become_user: ubuntu
+      shell: kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml >> pod_setup.txt
+      args:
+        chdir: $HOME
+        creates: pod_setup.txt
+    
+    - name: Create a new certificate key
+      shell: kubeadm init phase upload-certs --upload-certs
+      register: join_certificate_key
+    
+    - name: Get join command
+      shell: kubeadm token create --print-join-command --certificate-key "{{ join_certificate_key.stdout_lines[2] }}"
+      register: join_command
+    
+    - debug:
+        var: join_command
+    
+    - name: Copy join command to local file
+      local_action: 'copy content="{{ join_command.stdout_lines[0] }}" dest="./join_command"'
+    
+    - name: Get worker node join command
+      shell: kubeadm token create --print-join-command
+      register: join_node_command
+    
+    - name: Copy worker node join command to local file
+      local_action: copy content="{{ join_node_command.stdout_lines[0] }}" dest="./join_node_command"
+
+#### Configure other master nodes
+- hosts: masters_others
+  become: yes
+  tasks:
+   
+    - name: Copy the master join command to server location
+      copy: src=join_command dest=/tmp/join_command.sh mode=0777
+   
+    - name: Join the master node to cluster
+      command: sh /tmp/join_command.sh
+   
+    - name: Sleep for 20 seconds
+      wait_for:
+       timeout: 20
+   
+    - name: Create .kube directory
+      become: yes
+      become_user: ubuntu
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+   
+    - name: Check admin.conf file exists.
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_conf
+   
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+      when: k8s_conf.stat.exists
+
+##### Worker Node Configurations
+- hosts: workers
+  become: yes
+  tasks:
+
+    - name: Copy the worker join command to server location
+      copy: src=join_node_command dest=/tmp/join_node_command.sh mode=0777
+
+    - name: Join the worker node to cluster
+      command: sh /tmp/join_node_command.sh
