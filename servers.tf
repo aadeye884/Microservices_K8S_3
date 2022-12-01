@@ -1,13 +1,12 @@
-#Ansible
+# Ansible_Server
 resource "aws_instance" "ansible" {
-  ami           = var.ami_id
-  instance_type = "t2.micro"
-  subnet_id = module.vpc.public_subnets[0]
+  ami                         = var.ami_id
+  instance_type               = "t2.micro"
+  subnet_id                   = module.vpc.public_subnets[0]
   associate_public_ip_address = "true"
-  security_groups = [aws_security_group.allow_ssh.id]
-  key_name          =   aws_key_pair.k8_ssh.key_name
-  ##https://github.com/hashicorp/terraform/issues/30134
-  user_data = <<-EOF
+  security_groups             = [aws_security_group.allow_ssh.id]
+  key_name                    = aws_key_pair.k8_ssh.key_name
+  user_data                   = <<-EOF
     #!bin/bash
     echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /etc/ssh/sshd_config.d/10-insecure-rsa-keysig.conf
     systemctl reload sshd
@@ -28,12 +27,13 @@ resource "aws_instance" "ansible" {
 
 #Master
 resource "aws_instance" "masters" {
-  count         = var.master_node_count
-  ami           = var.ami_id
-  instance_type = var.master_instance_type
-  subnet_id = "${element(module.vpc.public_subnets, count.index)}"
-  key_name          =   aws_key_pair.k8_ssh.key_name
-  security_groups = [aws_security_group.k8_nondes.id, aws_security_group.k8_masters.id]
+  count                       = var.master_node_count
+  ami                         = var.ami_id
+  instance_type               = var.master_instance_type
+  subnet_id                   = element(module.vpc.private_subnets, count.index)
+  key_name                    = aws_key_pair.k8_ssh.key_name
+  security_groups             = [aws_security_group.CLUSTER_SG.id]#[aws_security_group.k8_nodes.id, aws_security_group.k8_masters.id]
+  associate_public_ip_address = false
 
   tags = {
     Name = format("Master-%02d", count.index + 1)
@@ -42,12 +42,13 @@ resource "aws_instance" "masters" {
 
 #Worker
 resource "aws_instance" "workers" {
-  count         = var.worker_node_count
-  ami           = var.ami_id
-  instance_type = var.worker_instance_type
-  subnet_id = "${element(module.vpc.public_subnets, count.index)}"
-  key_name          =   aws_key_pair.k8_ssh.key_name
-  security_groups = [aws_security_group.k8_nondes.id, aws_security_group.k8_workers.id]
+  count                       = var.worker_node_count
+  ami                         = var.ami_id
+  instance_type               = var.worker_instance_type
+  subnet_id                   = element(module.vpc.private_subnets, count.index)
+  key_name                    = aws_key_pair.k8_ssh.key_name
+  security_groups             = [aws_security_group.CLUSTER_SG.id]#[aws_security_group.k8_nodes.id, aws_security_group.k8_workers.id]
+  associate_public_ip_address = false
 
   tags = {
     Name = format("Worker-%02d", count.index + 1)

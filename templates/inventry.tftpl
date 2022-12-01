@@ -23,3 +23,8 @@ masters_others
 %{ for index, dns in workers-dns ~}
 ${dns} ansible_host=${workers-ip[index]} # ${workers-id[index]}
 %{ endfor ~}
+
+[clusterlb]
+%{ for index, dns in clusterlb-dns ~}
+${dns} ansible_host=${clusterlb-ip[index]} # ${clusterlb-id[index]}
+%{ endfor ~}

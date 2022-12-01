@@ -1,3 +1,23 @@
+terraform {
+  cloud {
+    organization = "testusteam1"
+
+    workspaces {
+      name = "sockshopnew"
+    }
+  }
+}
+
+/* terraform {
+  cloud {
+    organization = "sockshop_usteam1"
+
+    workspaces {
+      name = "sockshop"
+    }
+  }
+} */
+
 # terraform {
 #   backend "s3" {
 #   bucket = "group-1-terraform-state"

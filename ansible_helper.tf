@@ -7,6 +7,9 @@ resource "local_file" "ansible_inventory" {
             workers-dns = aws_instance.workers.*.private_dns,
             workers-ip  = aws_instance.workers.*.private_ip,
             workers-id  = aws_instance.workers.*.id
+            clusterlb-dns = aws_instance.clusterlb.*.private_dns,
+            clusterlb-ip  = aws_instance.clusterlb.*.private_ip,
+            clusterlb-id  = aws_instance.clusterlb.*.id
         }    
     )
     filename = "${path.root}/inventory"
@@ -54,6 +57,7 @@ resource "local_file" "ansible_vars_file" {
     content = <<-DOC
 
         master_ip: ${aws_instance.masters[0].private_ip}
+        clusterlb_ip: ${aws_instance.clusterlb.private_ip}
         DOC
     filename = "ansible/ansible_vars_file.yml"
 }
@@ -113,6 +117,39 @@ resource "null_resource" "run_ansible" {
     inline = [
       "echo 'starting ansible playbooks...'",
       "sleep 60 && ansible-playbook -i /home/ubuntu/inventory /home/ubuntu/ansible/play.yml ",
+    ] 
+  }
+}
+
+resource "null_resource" "run_clusterlb" {
+  depends_on = [
+    null_resource.provisioner,
+    null_resource.copy_ansible_playbooks,
+    aws_instance.masters,
+    aws_instance.workers,
+    module.vpc,
+    aws_instance.ansible,
+    time_sleep.wait_for_ansible_init,
+    null_resource.run_ansible
+  ]
+
+  triggers = {
+    always_run = timestamp()
+  }
+
+  connection {
+    type        = "ssh"
+    host        = aws_instance.ansible.public_ip
+    user        = var.ssh_user
+    private_key = tls_private_key.ssh.private_key_pem
+    insecure    = true
+    agent         = false
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'starting ansible playbooks...'",
+      "sleep 60 && ansible-playbook -i /home/ubuntu/inventory /home/ubuntu/ansible/clusterplay.yml ",
     ] 
   }
 }

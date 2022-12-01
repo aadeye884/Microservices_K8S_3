@@ -1,0 +1,27 @@
+- hosts: clusterlb
+  become: yes
+  tasks:
+
+    - name: Copy the master join command to server location
+      copy: src=/tmp/admin.conf dest=/tmp/admin.conf mode=0644
+
+    - name: Create .kube directory
+      become: yes
+      become_user: ubuntu
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 493
+   
+    - name: Check admin.conf file exists.
+      stat:
+        path: /tmp/admin.conf
+      register: k8s_conf
+   
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /tmp/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+      when: k8s_conf.stat.exists

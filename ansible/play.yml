@@ -1,5 +1,5 @@
 ### This will install prerequistes on all the kubernetes nodes (i.e masters and workers)
-- hosts: all
+- hosts: masters_first, masters_others, workers
   become: 'yes'
   tasks:
     
@@ -84,7 +84,7 @@
         force: 'yes'
     
     - name: Start the cluster
-      shell: kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address="{{ master_ip }}" >> cluster.txt
+      shell: kubeadm init --control-plane-endpoint "{{ clusterlb_ip }}:6443" --pod-network-cidr=192.168.0.0/16 >> cluster.txt
       register: result
       args:
         chdir: $HOME
@@ -93,7 +93,7 @@
     - name: Sleep for 20 seconds
       wait_for:
         timeout: 20
-    
+
     - name: Create .kube directory
       become: 'yes'
       become_user: ubuntu
@@ -143,6 +143,12 @@
     - name: Copy worker node join command to local file
       local_action: copy content="{{ join_node_command.stdout_lines[0] }}" dest="./join_node_command"
 
+    - name: ansible copy file from remote to local.
+      fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: /tmp/
+        flat: yes
+
 #### Configure other master nodes
 - hosts: masters_others
   become: yes
@@ -157,7 +163,7 @@
     - name: Sleep for 20 seconds
       wait_for:
        timeout: 20
-   
+
     - name: Create .kube directory
       become: yes
       become_user: ubuntu
