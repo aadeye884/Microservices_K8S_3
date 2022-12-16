@@ -3,3 +3,4 @@ provider.tf
 .terraform.*
 terraform.*
 terraform.tfvars
+stage.tfvars

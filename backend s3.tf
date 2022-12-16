@@ -1,12 +1,12 @@
-terraform {
+/* terraform {
   cloud {
-    organization = "testusteam1"
+    organization = "sockshop123"
 
     workspaces {
-      name = "sockshopnew"
+      name = "14-NOV-Sock-Shop-microservices-Kubernetes-Project---US-team-1"
     }
   }
-}
+} */
 
 /* terraform {
   cloud {
@@ -37,7 +37,7 @@ terraform {
 #   }
 #   backend "remote" {
 #   organization = "sockshop"
-    
+
 #     workspaces {
 #       name = "sockshop"
 #     }

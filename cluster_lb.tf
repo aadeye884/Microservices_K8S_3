@@ -3,10 +3,10 @@ resource "aws_instance" "clusterlb" {
   instance_type               = var.clusterlb_instance_type
   subnet_id                   = module.vpc.public_subnets[0]
   key_name                    = aws_key_pair.k8_ssh.key_name
-  security_groups             = [aws_security_group.CLUSTER_SG.id]#[aws_security_group.k8_nodes.id, aws_security_group.k8_masters.id]
+  security_groups             = [aws_security_group.CLUSTER_SG.id] #[aws_security_group.k8_nodes.id, aws_security_group.k8_masters.id]
   associate_public_ip_address = true
   # depends_on                  = [aws_instance.masters]
-  user_data                   = <<-EOF
+  user_data = <<-EOF
 #!/bin/bash
 sudo -i
 apt-get update -y

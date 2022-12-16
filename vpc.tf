@@ -1,27 +1,26 @@
-provider "aws" {
-  region = "us-west-2"
-  profile = "Groupaccess"
-  shared_credentials_files = ["~/.aws/credentials"]
-  /* access_key = var.accesskey
-  secret_key = var.secretkey */
-}
+ provider "aws" {
+  region = var.region
+  profile = var.profile 
+} 
 
 locals {
-  name   = "my-vpc"
-  region = "us-west-2"
+  name = "${terraform.workspace}-vpc"
+  /* region = var.region */
+  /* tags = "${terraform.workspace}-testing-tags" */
   tags = {
-    Environment = "dev"
+    Environment = var.Environment
     Terraform   = "true"
-    Name        = "my-vpc"
+    Name        = local.name
   }
+  name_Jenkins = "${terraform.workspace}-Jenkins"
 }
 
 module "vpc" {
-  source         = "terraform-aws-modules/vpc/aws"
-  name           = local.name
-  cidr           = var.vpc_cidr2
-  azs            = var.availability_zones
-  public_subnets = var.public_subnets
+  source          = "terraform-aws-modules/vpc/aws"
+  name            = local.name
+  cidr            = var.vpc_cidr2
+  azs             = var.availability_zones
+  public_subnets  = var.public_subnets
   private_subnets = var.private_subnets
 
   public_subnet_tags = {
@@ -31,8 +30,8 @@ module "vpc" {
     Name = "private-subnet"
   }
 
-  enable_nat_gateway = true
-  single_nat_gateway = true
+  enable_nat_gateway      = true
+  single_nat_gateway      = true
   create_igw              = true
   map_public_ip_on_launch = true
   tags                    = local.tags

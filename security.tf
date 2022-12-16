@@ -35,7 +35,7 @@ resource "aws_security_group" "CLUSTER_SG" {
     from_port   = 0
     to_port     = 65535
     protocol    = "tcp"
-    cidr_blocks = ["${var.vpc_cidr}"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -124,8 +124,7 @@ resource "aws_security_group" "CLUSTER_SG" {
 
 # }
 
-# resource "aws_security_group" "k8_workers" {
-#   name        = "k8_workers"
+# resource "aws_security_group" "k8_workers" { #   name        = "k8_workers"
 #   description = "sec group for k8 worker nodes"
 #   vpc_id      = module.vpc.vpc_id
 
@@ -145,3 +144,64 @@ resource "aws_security_group" "CLUSTER_SG" {
 #     cidr_blocks = ["${var.vpc_cidr}"]
 #   }
 # }
+
+#Jenkins SG
+resource "aws_security_group" "Jenkins_SG" {
+  name        = "Jenkins_SG"
+  description = "Allow ssh inbound traffic"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+/* Create Jenkins_lb Security Group */
+resource "aws_security_group" "jenkins_lbSG" {
+  name        = "jenkins_lbSG"
+  description = "Allow TLS inbound traffic"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "Allow http from VPC"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Allow http from VPC"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "Jenkins_lbSG"
+  }
+}

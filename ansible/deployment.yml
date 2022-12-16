@@ -1,0 +1,34 @@
+---
+ - hosts: masters_first
+   become: 'yes'
+   vars_files:
+    - ansible_vars_file.yml
+   tasks:
+
+    - name: Clone Application Repo
+      shell: git clone https://{{ username}}:{{ password }}@github.com/CloudHight/14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1
+
+    - name: Deploying Socks-Shop
+      shell: kubectl --kubeconfig=/home/ubuntu/.kube/config create -f complete-demo.yaml
+      args:
+        chdir: 14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1/deploy/kubernetes
+
+    - name: Create monitoring namespace
+      shell: kubectl --kubeconfig=/home/ubuntu/.kube/config create -f 00-monitoring-ns.yaml
+      args:
+        chdir: 14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1/deploy/kubernetes/manifests-monitoring
+
+    - name: Apply Prometheus Manifests
+      shell: kubectl --kubeconfig=/home/ubuntu/.kube/config apply $(ls *-prometheus-*.yaml | awk ' { print " -f " $1 } ')
+      args:
+        chdir: 14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1/deploy/kubernetes/manifests-monitoring
+
+    - name: Apply Grafana Manifests
+      shell: kubectl --kubeconfig=/home/ubuntu/.kube/config apply $(ls *-grafana-*.yaml | awk ' { print " -f " $1 }'  | grep -v grafana-import)
+      args:
+        chdir: 14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1/deploy/kubernetes/manifests-monitoring
+
+    - name: Import Grafana Dashboard
+      shell: kubectl --kubeconfig=/home/ubuntu/.kube/config apply -f 23-grafana-import-dash-batch.yaml
+      args:
+        chdir: 14-NOV-Sock-Shop-microservices-Kubernetes-Project-APP-REPO-US-team-1/deploy/kubernetes/manifests-monitoring
